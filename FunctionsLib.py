@@ -9,7 +9,7 @@ import time
 import re
 
 #初始化tushare接口
-ts.set_token('99858a63ddbc39334d2e61af5aa19f5ac5f5da5a2c109262ed68a092') #token如果失效，需要登陆Tushare官网刷新后更改
+ts.set_token('') #token如果失效，需要登陆Tushare官网刷新后更改
 pro = ts.pro_api()
 
 
