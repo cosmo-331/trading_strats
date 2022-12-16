@@ -27,7 +27,9 @@ class MA_cross(bt.Strategy):
         self.dataclose = self.datas[0].close
         self.MAslow = bt.indicators.MovingAverageSimple(self.datas[0], period = self.params.pslow)
         self.MAfast = bt.indicators.MovingAverageSimple(self.datas[0], period = self.params.pfast)
-        
+        self.transactions = {'date': [],
+                             'type': [],
+                             'price': []}
     def next(self):
         # Simply log the closing price of the series from the reference
         #self.log('Close, %.2f' % self.broker.get_cash())
@@ -47,9 +49,15 @@ class MA_cross(bt.Strategy):
         # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
             if order.isbuy():
+                self.transactions['date'].append(self.datas[0].datetime.date(0))
+                self.transactions['price'].append(order.executed.price)
+                self.transactions['type'].append('BUY')
                 self.log(f'BUY EXECUTED, {order.executed.price:.2f}')
             elif order.issell():
                 self.log(f'SELL EXECUTED, {order.executed.price:.2f}')
+                self.transactions['date'].append(self.datas[0].datetime.date(0))
+                self.transactions['price'].append(order.executed.price)
+                self.transactions['type'].append('SELL')
             self.bar_executed = len(self)
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
@@ -68,7 +76,9 @@ class MACD(bt.Strategy):
         # Keep a reference to the "close" line in the data[0] dataseries
         self.dataclose = self.datas[0].close
         self.macd = ind.MACDHisto(self.datas[0])
-        
+        self.transactions = {'date': [],
+                             'type': [],
+                             'price': []}
     def next(self):
         # Simply log the closing price of the series from the reference
         #self.log('Close, %.2f' % self.broker.get_cash())
@@ -89,9 +99,15 @@ class MACD(bt.Strategy):
         # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
             if order.isbuy():
+                self.transactions['date'].append(self.datas[0].datetime.date(0))
+                self.transactions['price'].append(order.executed.price)
+                self.transactions['type'].append('BUY')
                 self.log(f'BUY EXECUTED, {order.executed.price:.2f}')
             elif order.issell():
                 self.log(f'SELL EXECUTED, {order.executed.price:.2f}')
+                self.transactions['date'].append(self.datas[0].datetime.date(0))
+                self.transactions['price'].append(order.executed.price)
+                self.transactions['type'].append('SELL')
             self.bar_executed = len(self)
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
