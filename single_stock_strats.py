@@ -27,9 +27,7 @@ class MA_cross(bt.Strategy):
         self.dataclose = self.datas[0].close
         self.MAslow = bt.indicators.MovingAverageSimple(self.datas[0], period = self.params.pslow)
         self.MAfast = bt.indicators.MovingAverageSimple(self.datas[0], period = self.params.pfast)
-        self.transactions = {'date': [],
-                             'type': [],
-                             'price': []}
+        
     def next(self):
         # Simply log the closing price of the series from the reference
         #self.log('Close, %.2f' % self.broker.get_cash())
@@ -49,15 +47,9 @@ class MA_cross(bt.Strategy):
         # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.transactions['date'].append(self.datas[0].datetime.date(0))
-                self.transactions['price'].append(order.executed.price)
-                self.transactions['type'].append('BUY')
                 self.log(f'BUY EXECUTED, {order.executed.price:.2f}')
             elif order.issell():
                 self.log(f'SELL EXECUTED, {order.executed.price:.2f}')
-                self.transactions['date'].append(self.datas[0].datetime.date(0))
-                self.transactions['price'].append(order.executed.price)
-                self.transactions['type'].append('SELL')
             self.bar_executed = len(self)
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
@@ -76,9 +68,7 @@ class MACD(bt.Strategy):
         # Keep a reference to the "close" line in the data[0] dataseries
         self.dataclose = self.datas[0].close
         self.macd = ind.MACDHisto(self.datas[0])
-        self.transactions = {'date': [],
-                             'type': [],
-                             'price': []}
+        
     def next(self):
         # Simply log the closing price of the series from the reference
         #self.log('Close, %.2f' % self.broker.get_cash())
@@ -99,15 +89,9 @@ class MACD(bt.Strategy):
         # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.transactions['date'].append(self.datas[0].datetime.date(0))
-                self.transactions['price'].append(order.executed.price)
-                self.transactions['type'].append('BUY')
                 self.log(f'BUY EXECUTED, {order.executed.price:.2f}')
             elif order.issell():
                 self.log(f'SELL EXECUTED, {order.executed.price:.2f}')
-                self.transactions['date'].append(self.datas[0].datetime.date(0))
-                self.transactions['price'].append(order.executed.price)
-                self.transactions['type'].append('SELL')
             self.bar_executed = len(self)
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
@@ -138,6 +122,11 @@ def is_sssf(is_pos, vol):
             return True
     return False
 
+def is_support(low):
+    if (low[0]>low[1]) & (low[1]>low[2]) & (low[3]>low[2]) & (low[4]>low[3]):
+        return True
+    return False
+
 class DFP(bt.Strategy):
     def log(self, txt, dt=None):
         ''' Logging function for this strategy'''
@@ -152,11 +141,12 @@ class DFP(bt.Strategy):
         self.MA20 = ind.MovingAverageSimple(self.datas[0], period = 20)
         self.vol = self.datas[0].volume
         self.dataopen = self.datas[0].open
+        self.datalow = self.datas[0].low
+        self.datahigh = self.datas[0].high
         self.EMA15 = ind.EMA(self.datas[0], period = 15)
-        self.zhicheng = 0
-        self.bar_zhicheng = 0
-        self.bar_yali = 0
-        self.yali = 0
+        self.support = -1
+        self.resistance = -1
+        self.cost = -1
         self.transactions = {'date': [],
                              'type': [],
                              'price': []}
@@ -165,21 +155,21 @@ class DFP(bt.Strategy):
         # Simply log the closing price of the series from the reference
         #self.log('Close, %.2f' % self.broker.get_cash())
         
-        if self.EMA15[0] > self.EMA15[-1]:
-            self.zhicheng = self.bar_zhicheng
-        if (self.EMA15[0]>self.EMA15[-1]) & (self.EMA15[-1]<self.EMA15[-2]):
-            self.bar_zhicheng = self.EMA15[-1]
-        if self.EMA15[0] < self.EMA15[-1]:
-            self.yali = self.bar_yali
-        if (self.EMA15[0] < self.EMA15[-1]) & (self.EMA15[-1] > self.EMA15[-2]):
-            self.bar_yali = self.EMA15[-1]
-        
+        if is_support([self.datalow[i] for i in range(-4,1)]):
+            self.support = self.datalow[-2]
+        if is_support([-self.datahigh[i] for i in range(-4,1)]):
+            self.resistance = self.datahigh[-2]
+        #self.log('close: %.2f' % self.dataclose[0])
         if self.position:
-            if self.dataclose[0] > 1.05*self.MA20[0]:
+            # 止损
+            if self.dataclose[0] < self.cost*0.9:
+                self.order = self.close()
+            # 涨到压力位附近卖掉
+            if self.datahigh[0] > self.resistance*0.9+self.support*0.1:
                 #self.log('SELL CREATE, %.2f' % self.dataclose[0])
                 self.order = self.close()
         else:
-            if self.dataclose[0]<self.MA20[0]:
+            if self.datalow[0]<self.resistance*0.1+self.support*0.9:
                 for num in range(1,4):
                     for i in range(-num-6,-num-3):
                         if self.vol[i] > np.mean([self.vol[j] for j in range(i-5, i)])*1.1:
@@ -210,6 +200,7 @@ class DFP(bt.Strategy):
                 #cap = cap / order.executed.price
                 #now_time = self.datas.datetime.date(0)
                 self.log(f' BUY EXECUTED, {order.executed.price:.2f}')
+                self.cost = order.executed.price
                 self.transactions['date'].append(self.datas[0].datetime.date(0))
                 self.transactions['price'].append(order.executed.price)
                 self.transactions['type'].append('BUY')
